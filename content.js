@@ -5,15 +5,26 @@
   // 1. DICTIONNAIRES ENRICHIS
   // ══════════════════════════════════════════════════════════════════════════
 
-  // Haiku : verbes impératifs simples → requête directe et courte
+  // Haiku : verbes impératifs simples → requête directe et courte (FR + EN)
   const HAIKU_COMMANDS = [
-    'traduis', 'translate', 'résume', 'summarize', 'résumer',
-    'définis', 'define', 'liste', 'list', 'lister',
-    'corrige', 'correct', 'corriger', 'reformule', 'rephrase', 'reformuler',
-    'donne-moi', 'donne moi', 'give me', 'montre', 'show me',
+    // Traduction / Translation
+    'traduis', 'translate',
+    // Résumé / Summary
+    'résume', 'summarize', 'résumer', 'sum up',
+    // Définition / Definition
+    'définis', 'define', 'définir', 'what does', 'what is',
+    // Liste / List
+    'liste', 'list', 'lister', 'enumerate',
+    // Correction / Fix
+    'corrige', 'correct', 'corriger', 'fix', 'proofread',
+    // Reformulation / Rephrase
+    'reformule', 'rephrase', 'reformuler', 'reword', 'paraphrase',
+    // Commandes directes / Direct commands
+    'donne-moi', 'donne moi', 'give me', 'montre', 'show me', 'show',
     'convertis', 'convert', 'calcule', 'calculate', 'compte', 'count',
-    'épelle', 'spell', 'vérifie', 'check', 'cherche', 'find',
-    'explique', 'explain', 'décris', 'describe',
+    'épelle', 'spell', 'vérifie', 'check', 'cherche', 'find', 'lookup',
+    'explique', 'explain', 'décris', 'describe', 'clarify',
+    'formate', 'format', 'clean up', 'simplify', 'simplifie',
   ];
 
   // Sonnet : langages de programmation et frameworks
@@ -31,55 +42,75 @@
     'regex', 'recursion', 'async', 'await', 'promise', 'callback',
   ];
 
-  // Opus : domaines académiques, juridiques, financiers, scientifiques
+  // Opus : domaines académiques, juridiques, financiers, scientifiques (FR + EN)
   const OPUS_DOMAINS = [
-    // Analyse approfondie
+    // Analyse approfondie / In-depth analysis
     'analyse approfondie', 'analyse détaillée', 'in-depth analysis',
     'comprehensive analysis', 'deep dive', 'étude approfondie',
-    // Académique
+    'detailed analysis', 'thorough analysis', 'critical analysis',
+    'comprehensive review', 'systematic analysis', 'analyze in detail',
+    'explain in depth', 'in depth', 'en profondeur',
+    // Académique / Academic
     'recherche', 'research', 'théorème', 'theorem', 'démontrer', 'prove',
     'hypothèse', 'hypothesis', 'méthodologie', 'methodology', 'paradigme',
     'épistémologie', 'dissertation', 'mémoire', 'thèse', 'thesis',
     'peer review', 'publication scientifique', 'littérature académique',
-    // Juridique
+    'academic', 'scholarly', 'peer-reviewed', 'literature review',
+    // Juridique / Legal
     'juridique', 'légal', 'legal', 'contrat', 'contract', 'clause',
     'réglementation', 'compliance', 'gdpr', 'rgpd', 'tribunal',
     'litigation', 'litige', 'jurisprudence', 'legislation',
-    'article de loi', 'droit ', 'droit du',
-    // Financier
+    'article de loi', 'droit ', 'droit du', 'regulatory', 'liability',
+    // Financier / Financial
     'financier', 'financial', 'investissement', 'investment', 'portefeuille',
     'portfolio', 'rendement', 'return on investment', 'valorisation',
     'valuation', 'bilan', 'comptabilité', 'accounting', 'audit financier',
     "taux d'intérêt", 'interest rate', 'derivatives', 'risk assessment',
-    'due diligence', 'fusion-acquisition', 'ipo',
-    // Scientifique
+    'due diligence', 'fusion-acquisition', 'ipo', 'revenue model',
+    'profit margin', 'cash flow', 'forecasting', 'budget analysis',
+    // Scientifique / Scientific
     'scientifique', 'expérience', 'experiment', 'statistiques', 'statistics',
     'corrélation', 'régression', 'regression', 'modélisation', 'simulation',
     'machine learning', 'deep learning', 'neural network', 'llm',
-    'embedding', 'clustering', 'classification',
-    // Stratégie / Architecture
+    'embedding', 'clustering', 'classification', 'data science',
+    // Stratégie / Architecture / Strategy
     'stratégie', 'strategy', 'plan stratégique', 'transformation',
     'architecture système', 'system architecture', 'disruption',
     'innovation', 'business model', 'go-to-market', 'raisonnement complexe',
-    // Autres complexités
+    'strategic plan', 'roadmap', 'vision', 'competitive analysis',
+    // Autres complexités / Other complexities
     'compare', 'comparer', 'contrast', 'evaluate', 'évaluer',
     'pros and cons', 'avantages et inconvénients', 'tradeoff', 'trade-off',
     'optimize', 'optimiser', 'refactor', 'architecture', 'scalability',
     'scalabilité', 'security', 'sécurité', 'migration', 'intégration',
   ];
 
-  // ── 2. STRUCTURE DE PHRASE : connecteurs multi-étapes ────────────────────
+  // ── 2. STRUCTURE DE PHRASE : connecteurs multi-étapes (FR + EN) ──────────
   const MULTI_STEP_CONNECTORS = [
+    // Français
     'et puis', 'ensuite', 'également', 'en plus', 'de plus', 'par ailleurs',
     "d'abord", 'puis', 'enfin', 'finalement', 'au final',
     'premièrement', 'deuxièmement', 'troisièmement',
-    'furthermore', 'additionally', 'moreover', 'besides',
+    // English
+    'furthermore', 'additionally', 'moreover', 'besides', 'also',
     'first of all', 'secondly', 'thirdly', 'lastly', 'in addition',
-    'not only', 'as well as', 'on top of that',
+    'not only', 'as well as', 'on top of that', 'then', 'next',
+    'after that', 'afterward', 'following that', 'subsequently',
   ];
 
+  // ── 3. DÉTECTION DE LANGUE ───────────────────────────────────────────────
+  // Retourne 'fr', 'en', ou 'mixed' — informatif, n'affecte pas le scoring
+  // (les deux dictionnaires sont toujours analysés simultanément)
+  function detectLanguage(lower) {
+    const frMarkers = (lower.match(/[éèêëàâùûôîçœ]|(\ble\b|\bla\b|\bles\b|\bde\b|\bdu\b|\bes\b|\bun\b|\bune\b|\bdes\b|\bpour\b|\bavec\b|\bsur\b|\bdans\b|\bque\b|\bqui\b)/g) || []).length;
+    const enMarkers = (lower.match(/\b(the|is|are|was|were|have|has|be|to|of|and|for|with|on|in|that|this|it|an|at)\b/g) || []).length;
+    if (frMarkers > enMarkers * 1.5) return 'fr';
+    if (enMarkers > frMarkers * 1.5) return 'en';
+    return 'mixed';
+  }
+
   // ══════════════════════════════════════════════════════════════════════════
-  // 3. CONTEXTE DE CONVERSATION (lecture DOM silencieuse)
+  // 4. CONTEXTE DE CONVERSATION (lecture DOM silencieuse)
   // ══════════════════════════════════════════════════════════════════════════
 
   function analyzeConversationContext() {
@@ -258,12 +289,14 @@
     score = Math.max(minScore, Math.min(score, 100));
     score = Math.max(0, score);
 
+    const lang = detectLanguage(lower);
+
     if (score < 32) {
-      return { model: 'Haiku',  score, color: '#34d399', emoji: '⚡', reason: 'Requête simple — rapide et efficace' };
+      return { model: 'Haiku',  score, lang, color: '#34d399', emoji: '⚡', reason: 'Simple request — fast & efficient' };
     } else if (score < 64) {
-      return { model: 'Sonnet', score, color: '#818cf8', emoji: '✦', reason: 'Complexité modérée — performance équilibrée' };
+      return { model: 'Sonnet', score, lang, color: '#818cf8', emoji: '✦', reason: 'Moderate complexity — balanced performance' };
     } else {
-      return { model: 'Opus',   score, color: '#fbbf24', emoji: '◆', reason: 'Complexité élevée — raisonnement maximal' };
+      return { model: 'Opus',   score, lang, color: '#fbbf24', emoji: '◆', reason: 'High complexity — maximum reasoning' };
     }
   }
 
