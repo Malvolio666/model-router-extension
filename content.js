@@ -98,7 +98,27 @@
     'after that', 'afterward', 'following that', 'subsequently',
   ];
 
-  // ── 3. DÉTECTION DE LANGUE ───────────────────────────────────────────────
+  // ── 3. NORMALISATION ET REDONDANCE ──────────────────────────────────────
+
+  // Supprime les espaces excessifs et sauts de ligne multiples avant analyse
+  function normalizeText(text) {
+    return text
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  // Calcule la diversité lexicale : ratio mots-uniques / total
+  // ratio = 1.0 → aucune répétition · ratio → 0 → très redondant
+  function computeRedundancy(lower) {
+    const words = lower.split(/\s+/).filter(w => w.length > 1);
+    const total  = words.length;
+    if (total === 0) return { total: 0, unique: 0, ratio: 1 };
+    const unique = new Set(words).size;
+    return { total, unique, ratio: unique / total };
+  }
+
+  // ── 4. DÉTECTION DE LANGUE ───────────────────────────────────────────────
   // Retourne 'fr', 'en', ou 'mixed' — informatif, n'affecte pas le scoring
   // (les deux dictionnaires sont toujours analysés simultanément)
   function detectLanguage(lower) {
@@ -110,7 +130,7 @@
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // 4. CONTEXTE DE CONVERSATION (lecture DOM silencieuse)
+  // 5. CONTEXTE DE CONVERSATION (lecture DOM silencieuse)
   // ══════════════════════════════════════════════════════════════════════════
 
   function analyzeConversationContext() {
@@ -165,21 +185,34 @@
   function analyzeComplexity(text) {
     if (!text || text.trim().length < 3) return null;
 
-    const trimmed   = text.trim();
-    const lower     = trimmed.toLowerCase();
-    const words     = trimmed.split(/\s+/);
-    const wordCount = words.length;
-    const charCount = trimmed.length;
+    // Normaliser avant tout : espaces excessifs, sauts de ligne multiples
+    const trimmed    = normalizeText(text);
+    const lower      = trimmed.toLowerCase();
+    const charCount  = trimmed.length;
+    const redundancy = computeRedundancy(lower);
+    const wordCount  = redundancy.total;
+
+    // Longueur effective : si 80%+ de duplication, scorer sur la portion unique
+    // Un prompt de 1000 mots avec 50 mots uniques répétés → score comme 50 mots
+    const effectiveChars = redundancy.ratio < 0.20
+      ? Math.round(charCount * redundancy.ratio)
+      : charCount;
 
     let score    = 0;
-    let minScore = 0; // plancher imposé par signaux forts
+    let minScore = 0; // plancher imposé par mots-clés forts (prime sur la longueur)
 
-    // ── A. LONGUEUR BRUTE ────────────────────────────────────────────────────
-    if      (charCount < 60)  score += 8;
-    else if (charCount < 150) score += 20;
-    else if (charCount < 350) score += 36;
-    else if (charCount < 650) score += 50;
-    else                      score += 62;
+    // ── A. LONGUEUR EFFECTIVE (mots uniques, pas le total brut) ─────────────
+    // Un prompt de 200 mots avec 150 uniques score plus haut qu'un de
+    // 1000 mots avec 50 uniques répétés.
+    if      (effectiveChars < 60)  score += 8;
+    else if (effectiveChars < 150) score += 20;
+    else if (effectiveChars < 350) score += 36;
+    else if (effectiveChars < 650) score += 50;
+    else                           score += 62;
+
+    // Pénalité de redondance : contenu peu varié, même long, reste simple
+    if      (redundancy.ratio < 0.20) score -= 16;
+    else if (redundancy.ratio < 0.40) score -= 8;
 
     // ── B. DICTIONNAIRE HAIKU (commandes simples) ────────────────────────────
     // Impératif en début de phrase : signe de requête courte et directe
@@ -201,9 +234,14 @@
     }
 
     // ── C. DICTIONNAIRE SONNET (langages / frameworks) ───────────────────────
+    // Mots courts (≤ 4 chars) : word-boundary pour éviter les faux positifs
+    // (ex. "api" dans "capital", "sql" dans "casual", "git" dans "digital")
     let sonnetHits = 0;
     for (const kw of SONNET_LANGUAGES) {
-      if (lower.includes(kw)) sonnetHits++;
+      const matched = kw.length <= 4
+        ? new RegExp('\\b' + kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(lower)
+        : lower.includes(kw);
+      if (matched) sonnetHits++;
     }
     score += Math.min(sonnetHits * 6, 22);
     if (sonnetHits >= 1) minScore = Math.max(minScore, 32); // au moins Sonnet
@@ -236,9 +274,9 @@
     // E3. Impératif simple + phrase unique → Haiku renforcé
     if (haikuStartHit && sentenceCount <= 1) score -= 10;
 
-    // E4. Phrases denses (mots/phrase élevé)
+    // E4. Phrases denses ET lexicalement variées (mots/phrase élevé + diversité)
     const avgWordsPerSentence = wordCount / Math.max(sentenceCount, 1);
-    if (avgWordsPerSentence > 20) score += 8;
+    if (avgWordsPerSentence > 20 && redundancy.ratio > 0.40) score += 8;
 
     // E5. Listes numérotées ou à puces
     const numberedItems = (trimmed.match(/^\s*\d+[.)]/gm) || []).length;
@@ -286,6 +324,8 @@
     if (ctx.isTechnicalAndLong)  minScore = Math.max(minScore, 64);
 
     // ── RÉSULTAT FINAL ────────────────────────────────────────────────────────
+    // minScore (posé par les mots-clés) prime toujours sur la longueur :
+    // des mots-clés Opus dans un texte court → Opus garanti malgré le faible score brut.
     score = Math.max(minScore, Math.min(score, 100));
     score = Math.max(0, score);
 
