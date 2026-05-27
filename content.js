@@ -304,10 +304,9 @@
   // GESTION DU BADGE
   // ══════════════════════════════════════════════════════════════════════════
 
-  let badge         = null;
-  let currentEditor = null;
-  let rafPending    = false;
-  let isEnabled     = true;
+  let badge      = null;
+  let rafPending = false;
+  let isEnabled  = true;
 
   function ensureBadge() {
     if (badge) return badge;
@@ -316,35 +315,6 @@
     badge.className = 'mr-hidden';
     document.body.appendChild(badge);
     return badge;
-  }
-
-  function findSendButton() {
-    const ariaSelectors = [
-      'button[aria-label="Send message"]',
-      'button[aria-label="Send Message"]',
-      'button[aria-label*="Send"]',
-      'button[aria-label*="send"]',
-      'button[aria-label*="Envoyer"]',
-      'button[data-testid*="send"]',
-    ];
-    for (const sel of ariaSelectors) {
-      const btn = document.querySelector(sel);
-      if (btn) {
-        const r = btn.getBoundingClientRect();
-        if (r.width > 0 && r.height > 0) return btn;
-      }
-    }
-    if (!currentEditor) return null;
-    let parent = currentEditor.parentElement;
-    for (let i = 0; i < 6 && parent; i++, parent = parent.parentElement) {
-      const candidate = Array.from(parent.querySelectorAll('button')).find(btn => {
-        if (!btn.querySelector('svg')) return false;
-        const r = btn.getBoundingClientRect();
-        return r.width > 0 && r.right > window.innerWidth * 0.65;
-      });
-      if (candidate) return candidate;
-    }
-    return null;
   }
 
   function positionBadge() {
@@ -377,27 +347,25 @@
   // DÉTECTION DE L'ÉDITEUR & ÉVÉNEMENTS
   // ══════════════════════════════════════════════════════════════════════════
 
-  function findEditor() {
-    const candidates = Array.from(
-      document.querySelectorAll('div[contenteditable="true"]')
-    );
-    return candidates.find(el => {
-      const r = el.getBoundingClientRect();
-      return r.width > 200 && r.height > 20 && r.bottom > window.innerHeight * 0.35;
-    }) || null;
-  }
-
   function getEditorText(el) {
     return el.innerText || el.textContent || el.value || '';
   }
 
-  function handleInput(e) {
+  // Vérifie si un élément est le champ de saisie principal de claude.ai.
+  // Utilisé à chaque événement : aucun élément DOM n'est stocké durablement,
+  // ce qui rend l'extension immune à toute recréation de l'éditeur.
+  function isMainEditor(el) {
+    if (!el || el.getAttribute('contenteditable') !== 'true') return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 200 && r.height > 20 && r.bottom > window.innerHeight * 0.35;
+  }
+
+  function handleEditorInput(el) {
     if (!isEnabled || rafPending) return;
-    const editor = e.currentTarget;
     rafPending = true;
     requestAnimationFrame(() => {
       rafPending = false;
-      const text = getEditorText(editor);
+      const text = getEditorText(el);
       if (text.trim().length < 5) { hideBadge(); return; }
       const result = analyzeComplexity(text);
       if (result) showBadge(result);
@@ -408,13 +376,6 @@
   function handleSend() {
     hideBadge();
     rafPending = false;
-  }
-
-  function attachEditor(editor) {
-    if (currentEditor === editor) return;
-    if (currentEditor) currentEditor.removeEventListener('input', handleInput);
-    currentEditor = editor;
-    editor.addEventListener('input', handleInput);
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -428,26 +389,30 @@
 
     ensureBadge();
 
-    const obs = new MutationObserver(() => {
-      const ed = findEditor();
-      if (ed) attachEditor(ed);
+    // Event delegation en phase de capture : un unique listener sur document
+    // intercepte les input events sur tout éditeur, qu'il ait été créé au
+    // chargement ou recréé par claude.ai après chaque message envoyé.
+    document.addEventListener('input', e => {
+      if (isMainEditor(e.target)) handleEditorInput(e.target);
+    }, true);
+
+    // MutationObserver : repositionne le badge si le layout change
+    // (ouverture d'un nouveau fil, redimensionnement de la zone de saisie…)
+    new MutationObserver(() => {
       if (badge && badge.className === 'mr-visible') positionBadge();
-    });
-    obs.observe(document.body, { childList: true, subtree: true });
+    }).observe(document.body, { childList: true, subtree: true });
 
-    const ed = findEditor();
-    if (ed) attachEditor(ed);
-
+    // Envoi : touche Entrée — vérifie l'élément actif au moment de l'appui,
+    // sans dépendre d'une référence DOM stockée qui pourrait être périmée.
     document.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
-        if (currentEditor &&
-            (document.activeElement === currentEditor ||
-             currentEditor.contains(document.activeElement))) {
+        if (isMainEditor(document.activeElement)) {
           setTimeout(handleSend, 60);
         }
       }
     }, true);
 
+    // Envoi : clic sur le bouton d'envoi
     document.addEventListener('click', e => {
       const btn = e.target.closest('button');
       if (!btn) return;
