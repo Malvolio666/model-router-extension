@@ -14,6 +14,22 @@ Pendant que vous tapez dans claude.ai, un badge apparaît en haut de page avec u
 | ✦ **Sonnet** | Équilibré | Code (Python, React, SQL…), rédaction, analyse technique |
 | ◆ **Opus** | Raisonnement maximal | Recherche approfondie, droit, finance, stratégie, multi-étapes |
 
+### ⚡ Haiku — requête simple
+
+![Badge Haiku](screenshots/haiku.png)
+
+### ✦ Sonnet — code et technique
+
+![Badge Sonnet](screenshots/sonnet.png)
+
+### ◆ Opus — analyse complexe
+
+![Badge Opus](screenshots/opus.png)
+
+### Après envoi — badge effacé
+
+![Après envoi](screenshots/after-send.png)
+
 ---
 
 ## Installation
