@@ -1,6 +1,8 @@
 # Model Router for Claude
 
-Chrome extension that analyses your query complexity in real time and suggests the optimal Claude model — **100% local, no external calls, works in French and English**.
+Automatically suggests the optimal Claude model (Haiku, Sonnet, or Opus) for each prompt. 100% local, no data sent.
+
+> Model Router analyzes your prompts in real-time and recommends the most efficient Claude model — Haiku for simple tasks, Sonnet for everyday work, Opus for complex reasoning. Stop overspending tokens on requests that don't need it. Works entirely in your browser, zero data sent to any server.
 
 ---
 

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Model Router for Claude",
   "version": "1.0.0",
-  "description": "Suggère le modèle Claude optimal selon la complexité de votre requête — 100% local",
+  "description": "Automatically suggests the optimal Claude model (Haiku, Sonnet, or Opus) for each prompt. 100% local, no data sent.",
   "permissions": ["storage"],
   "host_permissions": ["https://claude.ai/*"],
   "icons": {
