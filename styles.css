@@ -1,0 +1,73 @@
+/* Model Router badge — injecté dans claude.ai */
+
+#mr-badge {
+  position: fixed;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px 7px 12px;
+  background: rgba(10, 10, 16, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-left: 3px solid transparent;       /* coloré selon le modèle */
+  border-radius: 10px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.88);
+  pointer-events: none;
+  user-select: none;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+/* Couleur de la bordure gauche selon le modèle recommandé */
+#mr-badge[data-model="haiku"]  { border-left-color: #34d399; box-shadow: 0 4px 24px rgba(0,0,0,0.55), 0 0 14px rgba(52,  211, 153, 0.18), 0 0 0 1px rgba(255,255,255,0.04); }
+#mr-badge[data-model="sonnet"] { border-left-color: #818cf8; box-shadow: 0 4px 24px rgba(0,0,0,0.55), 0 0 14px rgba(129, 140, 248, 0.18), 0 0 0 1px rgba(255,255,255,0.04); }
+#mr-badge[data-model="opus"]   { border-left-color: #fbbf24; box-shadow: 0 4px 24px rgba(0,0,0,0.55), 0 0 14px rgba(251, 191,  36, 0.18), 0 0 0 1px rgba(255,255,255,0.04); }
+
+#mr-badge.mr-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+#mr-badge.mr-hidden {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-6px);
+  pointer-events: none;
+}
+
+.mr-icon {
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.mr-model {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  /* couleur héritée de l'attribut data-model via JS (inline style conservé pour compatibilité) */
+}
+
+/* Couleur du nom de modèle selon l'attribut data-model */
+#mr-badge[data-model="haiku"]  .mr-model { color: #34d399; }
+#mr-badge[data-model="sonnet"] .mr-model { color: #818cf8; }
+#mr-badge[data-model="opus"]   .mr-model { color: #fbbf24; }
+
+.mr-dot {
+  color: rgba(255, 255, 255, 0.20);
+  margin: 0 1px;
+  flex-shrink: 0;
+}
+
+.mr-reason {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.50);
+  font-weight: 400;
+}

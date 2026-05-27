@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model Router</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 272px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0c0c12;
+      color: #e2e2e2;
+      font-size: 13px;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px 13px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .brand-logo {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .brand-text {}
+
+    .brand-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 0.01em;
+    }
+
+    .brand-sub {
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.35);
+      margin-top: 1px;
+    }
+
+    /* ── Toggle ── */
+    .toggle-wrap {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .toggle-label {
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.35);
+      line-height: 1;
+    }
+
+    .toggle {
+      position: relative;
+      width: 34px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
+    .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 9px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .toggle input:checked + .toggle-track { background: #6366f1; }
+
+    .toggle-thumb {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 12px;
+      height: 12px;
+      background: #fff;
+      border-radius: 50%;
+      pointer-events: none;
+      transition: left 0.2s ease;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+
+    .toggle input:checked ~ .toggle-thumb { left: 19px; }
+
+    /* ── Models ── */
+    .section-title {
+      padding: 12px 16px 6px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.28);
+    }
+
+    .models {
+      padding: 0 12px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .model-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 9px 10px;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .model-icon {
+      font-size: 15px;
+      margin-top: 1px;
+      flex-shrink: 0;
+      width: 18px;
+      text-align: center;
+    }
+
+    .model-name {
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.01em;
+    }
+
+    .model-desc {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.40);
+      margin-top: 2px;
+      line-height: 1.45;
+    }
+
+    /* ── Algorithm info ── */
+    .algo {
+      margin: 0 12px 12px;
+      padding: 9px 11px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+    }
+
+    .algo-title {
+      font-size: 10px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.35);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .algo-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .algo-tag {
+      padding: 2px 7px;
+      border-radius: 20px;
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.50);
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* ── Footer ── */
+    .footer {
+      padding: 9px 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.22);
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }
+
+    .footer-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #34d399;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="brand">
+      <div class="brand-logo">✦</div>
+      <div class="brand-text">
+        <div class="brand-name">Model Router</div>
+        <div class="brand-sub">claude.ai · analyse locale</div>
+      </div>
+    </div>
+    <div class="toggle-wrap">
+      <span class="toggle-label" id="toggleLabel">ON</span>
+      <label class="toggle" title="Activer / Désactiver">
+        <input type="checkbox" id="enableToggle" checked>
+        <div class="toggle-track"></div>
+        <div class="toggle-thumb"></div>
+      </label>
+    </div>
+  </div>
+
+  <div class="section-title">Modèles suggérés</div>
+
+  <div class="models">
+    <div class="model-row">
+      <div class="model-icon">⚡</div>
+      <div>
+        <div class="model-name" style="color:#34d399">Haiku</div>
+        <div class="model-desc">Questions simples, traductions, reformulations, définitions courtes</div>
+      </div>
+    </div>
+    <div class="model-row">
+      <div class="model-icon">✦</div>
+      <div>
+        <div class="model-name" style="color:#818cf8">Sonnet</div>
+        <div class="model-desc">Code, rédaction, analyse, tâches techniques standard</div>
+      </div>
+    </div>
+    <div class="model-row">
+      <div class="model-icon">◆</div>
+      <div>
+        <div class="model-name" style="color:#fbbf24">Opus</div>
+        <div class="model-desc">Raisonnement complexe, recherche approfondie, multi-étapes</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="algo">
+    <div class="algo-title">Critères d'analyse</div>
+    <div class="algo-tags">
+      <span class="algo-tag">longueur</span>
+      <span class="algo-tag">mots-clés</span>
+      <span class="algo-tag">termes techniques</span>
+      <span class="algo-tag">blocs de code</span>
+      <span class="algo-tag">structure</span>
+      <span class="algo-tag">nb de questions</span>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-dot"></div>
+    Aucune donnée envoyée — 100% local
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
