@@ -100,7 +100,6 @@
 
   // ── 3. NORMALISATION ET REDONDANCE ──────────────────────────────────────
 
-  // Supprime les espaces excessifs et sauts de ligne multiples avant analyse
   function normalizeText(text) {
     return text
       .replace(/[ \t]+/g, ' ')
@@ -108,8 +107,6 @@
       .trim();
   }
 
-  // Calcule la diversité lexicale : ratio mots-uniques / total
-  // ratio = 1.0 → aucune répétition · ratio → 0 → très redondant
   function computeRedundancy(lower) {
     const words = lower.split(/\s+/).filter(w => w.length > 1);
     const total  = words.length;
@@ -119,8 +116,6 @@
   }
 
   // ── 4. DÉTECTION DE LANGUE ───────────────────────────────────────────────
-  // Retourne 'fr', 'en', ou 'mixed' — informatif, n'affecte pas le scoring
-  // (les deux dictionnaires sont toujours analysés simultanément)
   function detectLanguage(lower) {
     const frMarkers = (lower.match(/[éèêëàâùûôîçœ]|(\ble\b|\bla\b|\bles\b|\bde\b|\bdu\b|\bes\b|\bun\b|\bune\b|\bdes\b|\bpour\b|\bavec\b|\bsur\b|\bdans\b|\bque\b|\bqui\b)/g) || []).length;
     const enMarkers = (lower.match(/\b(the|is|are|was|were|have|has|be|to|of|and|for|with|on|in|that|this|it|an|at)\b/g) || []).length;
@@ -139,7 +134,6 @@
     let isTechnicalAndLong = false;
 
     try {
-      // Compter les tours utilisateur (chaque tour = 1 échange)
       let exchanges = 0;
       const turnSelectors = [
         '[data-testid="human-turn"]',
@@ -154,15 +148,14 @@
         if (found > 0) { exchanges = found; break; }
       }
 
-      // Détecter du code dans les messages affichés (pas dans notre badge ni le textarea)
       const codeEls = document.querySelectorAll('pre, code');
       for (const el of codeEls) {
         if (el.closest('#mr-badge')) continue;
+        if (el.closest('#bd-badge')) continue;
         if (el.closest('[contenteditable]')) continue;
         if ((el.textContent || '').trim().length > 15) { hasCode = true; break; }
       }
 
-      // Bonus selon longueur de conversation
       if (exchanges >= 5) {
         bonus += 15;
         if (hasCode) { bonus += 10; isTechnicalAndLong = true; }
@@ -185,37 +178,30 @@
   function analyzeComplexity(text) {
     if (!text || text.trim().length < 3) return null;
 
-    // Normaliser avant tout : espaces excessifs, sauts de ligne multiples
     const trimmed    = normalizeText(text);
     const lower      = trimmed.toLowerCase();
     const charCount  = trimmed.length;
     const redundancy = computeRedundancy(lower);
     const wordCount  = redundancy.total;
 
-    // Longueur effective : si 80%+ de duplication, scorer sur la portion unique
-    // Un prompt de 1000 mots avec 50 mots uniques répétés → score comme 50 mots
     const effectiveChars = redundancy.ratio < 0.20
       ? Math.round(charCount * redundancy.ratio)
       : charCount;
 
     let score    = 0;
-    let minScore = 0; // plancher imposé par mots-clés forts (prime sur la longueur)
+    let minScore = 0;
 
-    // ── A. LONGUEUR EFFECTIVE (mots uniques, pas le total brut) ─────────────
-    // Un prompt de 200 mots avec 150 uniques score plus haut qu'un de
-    // 1000 mots avec 50 uniques répétés.
+    // ── A. LONGUEUR EFFECTIVE ────────────────────────────────────────────────
     if      (effectiveChars < 60)  score += 8;
     else if (effectiveChars < 150) score += 20;
     else if (effectiveChars < 350) score += 36;
     else if (effectiveChars < 650) score += 50;
     else                           score += 62;
 
-    // Pénalité de redondance : contenu peu varié, même long, reste simple
     if      (redundancy.ratio < 0.20) score -= 16;
     else if (redundancy.ratio < 0.40) score -= 8;
 
-    // ── B. DICTIONNAIRE HAIKU (commandes simples) ────────────────────────────
-    // Impératif en début de phrase : signe de requête courte et directe
+    // ── B. DICTIONNAIRE HAIKU ────────────────────────────────────────────────
     let haikuStartHit = false;
     for (const kw of HAIKU_COMMANDS) {
       if (lower.startsWith(kw + ' ') || lower === kw || lower.startsWith(kw + '\n')) {
@@ -224,7 +210,6 @@
         break;
       }
     }
-    // Mot-clé Haiku présent n'importe où (moins pénalisant)
     if (!haikuStartHit) {
       let haikuHits = 0;
       for (const kw of HAIKU_COMMANDS) {
@@ -233,9 +218,7 @@
       score -= Math.min(haikuHits * 6, 18);
     }
 
-    // ── C. DICTIONNAIRE SONNET (langages / frameworks) ───────────────────────
-    // Mots courts (≤ 4 chars) : word-boundary pour éviter les faux positifs
-    // (ex. "api" dans "capital", "sql" dans "casual", "git" dans "digital")
+    // ── C. DICTIONNAIRE SONNET ───────────────────────────────────────────────
     let sonnetHits = 0;
     for (const kw of SONNET_LANGUAGES) {
       const matched = kw.length <= 4
@@ -244,26 +227,24 @@
       if (matched) sonnetHits++;
     }
     score += Math.min(sonnetHits * 6, 22);
-    if (sonnetHits >= 1) minScore = Math.max(minScore, 32); // au moins Sonnet
+    if (sonnetHits >= 1) minScore = Math.max(minScore, 32);
 
-    // ── D. DICTIONNAIRE OPUS (académique / juridique / financier / scientifique)
+    // ── D. DICTIONNAIRE OPUS ─────────────────────────────────────────────────
     let opusHits = 0;
     for (const kw of OPUS_DOMAINS) {
       if (lower.includes(kw)) opusHits++;
     }
     score += Math.min(opusHits * 10, 32);
-    if (opusHits >= 2) minScore = Math.max(minScore, 64); // au moins Opus
+    if (opusHits >= 2) minScore = Math.max(minScore, 64);
 
     // ── E. STRUCTURE DE PHRASE ───────────────────────────────────────────────
     const sentences     = trimmed.split(/[.!?]+/).filter(s => s.trim().length > 3);
     const sentenceCount = sentences.length;
 
-    // E1. Nombre de phrases : 1 → Haiku, 2-3 → Sonnet, 4+ → Opus
     if      (sentenceCount === 1) score -= 8;
     else if (sentenceCount <= 3)  score += 6;
     else                          score += 16;
 
-    // E2. Connecteurs multi-étapes → Opus
     let connectorHits = 0;
     for (const c of MULTI_STEP_CONNECTORS) {
       if (lower.includes(c)) connectorHits++;
@@ -271,30 +252,23 @@
     if      (connectorHits >= 2) { score += 18; minScore = Math.max(minScore, 64); }
     else if (connectorHits === 1) score += 8;
 
-    // E3. Impératif simple + phrase unique → Haiku renforcé
     if (haikuStartHit && sentenceCount <= 1) score -= 10;
 
-    // E4. Phrases denses ET lexicalement variées (mots/phrase élevé + diversité)
     const avgWordsPerSentence = wordCount / Math.max(sentenceCount, 1);
     if (avgWordsPerSentence > 20 && redundancy.ratio > 0.40) score += 8;
 
-    // E5. Listes numérotées ou à puces
     const numberedItems = (trimmed.match(/^\s*\d+[.)]/gm) || []).length;
     const bulletItems   = (trimmed.match(/^\s*[-•*]/gm) || []).length;
     if (numberedItems >= 2 || bulletItems >= 2) score += 12;
 
-    // E6. Questions multiples
     const qCount = (trimmed.match(/\?/g) || []).length;
     if (qCount > 1) score += (qCount - 1) * 6;
 
     // ── F. TYPE DE CONTENU DÉTECTÉ ───────────────────────────────────────────
-
-    // F1. URL dans la requête → Sonnet minimum (analyse de lien)
     const hasURL = /https?:\/\/[^\s]+/.test(trimmed) ||
                    /www\.[a-z0-9-]+\.[a-z]{2,}/i.test(trimmed);
     if (hasURL) { score += 15; minScore = Math.max(minScore, 32); }
 
-    // F2. Blocs de code collés (backticks ou indentation significative)
     const codeBlocks  = trimmed.match(/```[\s\S]*?```/g) || [];
     const inlineCode  = (trimmed.match(/`[^`\n]+`/g) || []).length;
     const indentLines = (trimmed.match(/^(\s{4}|\t)\S/gm) || []).length;
@@ -308,11 +282,9 @@
       minScore = Math.max(minScore, 32);
     }
 
-    // F3. Données numériques abondantes (tableaux, stats, métriques)
     const numberCount = (trimmed.match(/\b\d+([.,]\d+)?(%|€|\$|k|M|G)?\b/g) || []).length;
     if (numberCount >= 5) { score += 10; minScore = Math.max(minScore, 32); }
 
-    // F4. Référence à un fichier uploadé → Sonnet minimum
     const hasFileRef = /\.(pdf|docx?|xlsx?|csv|json|xml|txt|png|jpe?g|svg|zip|py|js|ts)\b/i
       .test(trimmed);
     if (hasFileRef) { score += 15; minScore = Math.max(minScore, 32); }
@@ -323,9 +295,6 @@
     if (ctx.hasCode)             minScore = Math.max(minScore, 32);
     if (ctx.isTechnicalAndLong)  minScore = Math.max(minScore, 64);
 
-    // ── RÉSULTAT FINAL ────────────────────────────────────────────────────────
-    // minScore (posé par les mots-clés) prime toujours sur la longueur :
-    // des mots-clés Opus dans un texte court → Opus garanti malgré le faible score brut.
     score = Math.max(minScore, Math.min(score, 100));
     score = Math.max(0, score);
 
@@ -341,7 +310,7 @@
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // GESTION DU BADGE
+  // GESTION DU BADGE MODEL ROUTER
   // ══════════════════════════════════════════════════════════════════════════
 
   let badge      = null;
@@ -376,11 +345,123 @@
     requestAnimationFrame(() => {
       positionBadge();
       b.className = 'mr-visible';
+      if (batchBadge && batchBadge.className === 'bd-visible') positionBatchBadge();
     });
   }
 
   function hideBadge() {
     if (badge) badge.className = 'mr-hidden';
+    if (batchBadge && batchBadge.className === 'bd-visible') positionBatchBadge();
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // BATCH DETECTOR
+  // ══════════════════════════════════════════════════════════════════════════
+
+  const BATCH_WORD_THRESHOLD = 15;       // prompt considered "short" below this
+  const BATCH_MIN_HISTORY    = 2;        // short messages needed in session
+  const BATCH_COOLDOWN_MS    = 5 * 60 * 1000; // 5 min between badge shows
+
+  let batchBadge         = null;
+  let batchCooldownUntil = 0;
+  let shortMsgHistory    = [];           // timestamps of sent short messages this session
+  let batchTooltipOpen   = false;
+
+  function countWords(text) {
+    return text.trim().split(/\s+/).filter(w => w.length > 0).length;
+  }
+
+  function ensureBatchBadge() {
+    if (batchBadge) return batchBadge;
+    batchBadge = document.createElement('div');
+    batchBadge.id = 'bd-badge';
+    batchBadge.className = 'bd-hidden';
+    batchBadge.innerHTML =
+      '<div class="bd-main-row">' +
+        '<span class="bd-icon">⊕</span>' +
+        '<span class="bd-msg">Batch opportunity — combine your tasks into one prompt for better results</span>' +
+        '<button class="bd-btn" type="button">Show me how</button>' +
+      '</div>' +
+      '<div class="bd-tooltip" hidden>' +
+        '<div class="bd-tooltip-section">' +
+          '<span class="bd-tooltip-label">Instead of sending separately:</span>' +
+          '<div class="bd-tooltip-items">' +
+            '<span>→ Summarize this</span>' +
+            '<span>→ Pull key insights</span>' +
+            '<span>→ Write a headline</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="bd-tooltip-section">' +
+          '<span class="bd-tooltip-label">Send once:</span>' +
+          '<div class="bd-tooltip-combined">“Summarize this, pull the 3 key insights, and write a headline.”</div>' +
+        '</div>' +
+      '</div>';
+
+    batchBadge.querySelector('.bd-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      batchTooltipOpen = !batchTooltipOpen;
+      const tt  = batchBadge.querySelector('.bd-tooltip');
+      const btn = batchBadge.querySelector('.bd-btn');
+      if (batchTooltipOpen) {
+        tt.removeAttribute('hidden');
+        btn.textContent = 'Got it ✕';
+      } else {
+        tt.setAttribute('hidden', '');
+        btn.textContent = 'Show me how';
+      }
+      positionBatchBadge();
+    });
+
+    document.body.appendChild(batchBadge);
+    return batchBadge;
+  }
+
+  function positionBatchBadge() {
+    if (!batchBadge) return;
+    const modelVisible = badge && badge.className === 'mr-visible';
+    if (modelVisible) {
+      const rect = badge.getBoundingClientRect();
+      batchBadge.style.top = (rect.bottom + 8) + 'px';
+    } else {
+      batchBadge.style.top = '20px';
+    }
+    batchBadge.style.left   = '50%';
+    batchBadge.style.right  = 'auto';
+    batchBadge.style.bottom = 'auto';
+  }
+
+  function showBatchBadge() {
+    const b = ensureBatchBadge();
+    batchCooldownUntil = Date.now() + BATCH_COOLDOWN_MS;
+    requestAnimationFrame(() => {
+      positionBatchBadge();
+      b.className = 'bd-visible';
+    });
+  }
+
+  function hideBatchBadge() {
+    if (!batchBadge) return;
+    batchBadge.className = 'bd-hidden';
+    batchTooltipOpen = false;
+    const tt  = batchBadge.querySelector('.bd-tooltip');
+    const btn = batchBadge.querySelector('.bd-btn');
+    if (tt)  tt.setAttribute('hidden', '');
+    if (btn) btn.textContent = 'Show me how';
+  }
+
+  function checkBatchOpportunity(text) {
+    if (!isEnabled) return false;
+    if (countWords(text) >= BATCH_WORD_THRESHOLD) return false;
+    if (shortMsgHistory.length < BATCH_MIN_HISTORY) return false;
+    if (Date.now() < batchCooldownUntil) return false;
+    return true;
+  }
+
+  function recordSentMessage(text) {
+    if (!text) return;
+    if (countWords(text) < BATCH_WORD_THRESHOLD) {
+      shortMsgHistory.push(Date.now());
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -391,9 +472,6 @@
     return el.innerText || el.textContent || el.value || '';
   }
 
-  // Vérifie si un élément est le champ de saisie principal de claude.ai.
-  // Utilisé à chaque événement : aucun élément DOM n'est stocké durablement,
-  // ce qui rend l'extension immune à toute recréation de l'éditeur.
   function isMainEditor(el) {
     if (!el || el.getAttribute('contenteditable') !== 'true') return false;
     const r = el.getBoundingClientRect();
@@ -406,15 +484,30 @@
     requestAnimationFrame(() => {
       rafPending = false;
       const text = getEditorText(el);
-      if (text.trim().length < 5) { hideBadge(); return; }
+      if (text.trim().length < 5) {
+        hideBadge();
+        hideBatchBadge();
+        return;
+      }
+
+      // Model Router badge
       const result = analyzeComplexity(text);
       if (result) showBadge(result);
       else hideBadge();
+
+      // Batch Detector badge
+      if (countWords(text) >= BATCH_WORD_THRESHOLD) {
+        hideBatchBadge();
+      } else if (checkBatchOpportunity(text)) {
+        showBatchBadge();
+      }
     });
   }
 
-  function handleSend() {
+  function handleSend(text) {
+    recordSentMessage(text);
     hideBadge();
+    hideBatchBadge();
     rafPending = false;
   }
 
@@ -428,50 +521,54 @@
     });
 
     ensureBadge();
+    ensureBatchBadge();
 
-    // Event delegation en phase de capture : un unique listener sur document
-    // intercepte les input events sur tout éditeur, qu'il ait été créé au
-    // chargement ou recréé par claude.ai après chaque message envoyé.
     document.addEventListener('input', e => {
       if (isMainEditor(e.target)) handleEditorInput(e.target);
     }, true);
 
-    // MutationObserver : repositionne le badge si le layout change
-    // (ouverture d'un nouveau fil, redimensionnement de la zone de saisie…)
     new MutationObserver(() => {
       if (badge && badge.className === 'mr-visible') positionBadge();
+      if (batchBadge && batchBadge.className === 'bd-visible') positionBatchBadge();
     }).observe(document.body, { childList: true, subtree: true });
 
-    // Envoi : touche Entrée — vérifie l'élément actif au moment de l'appui,
-    // sans dépendre d'une référence DOM stockée qui pourrait être périmée.
     document.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
         if (isMainEditor(document.activeElement)) {
-          setTimeout(handleSend, 60);
+          const text = getEditorText(document.activeElement);
+          setTimeout(() => handleSend(text), 60);
         }
       }
     }, true);
 
-    // Envoi : clic sur le bouton d'envoi
     document.addEventListener('click', e => {
       const btn = e.target.closest('button');
       if (!btn) return;
+      // Ignore clicks inside the batch badge itself
+      if (btn.closest('#bd-badge')) return;
       const lbl  = (btn.getAttribute('aria-label') || '').toLowerCase();
       const type = btn.getAttribute('type') || '';
       if (lbl.includes('send') || lbl.includes('envoyer') || type === 'submit') {
-        setTimeout(handleSend, 60);
+        const editors = Array.from(document.querySelectorAll('[contenteditable="true"]'));
+        const mainEditor = editors.find(el => isMainEditor(el));
+        const text = mainEditor ? getEditorText(mainEditor) : '';
+        setTimeout(() => handleSend(text), 60);
       }
     }, true);
 
     window.addEventListener('resize', () => {
       if (badge && badge.className === 'mr-visible') positionBadge();
+      if (batchBadge && batchBadge.className === 'bd-visible') positionBatchBadge();
     }, { passive: true });
   }
 
   chrome.storage.onChanged.addListener(changes => {
     if ('mrEnabled' in changes) {
       isEnabled = changes.mrEnabled.newValue !== false;
-      if (!isEnabled) hideBadge();
+      if (!isEnabled) {
+        hideBadge();
+        hideBatchBadge();
+      }
     }
   });
 

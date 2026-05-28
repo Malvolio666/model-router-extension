@@ -71,3 +71,133 @@
   color: rgba(255, 255, 255, 0.50);
   font-weight: 400;
 }
+
+/* ── Batch Detector badge ─────────────────────────────────────────────── */
+
+#bd-badge {
+  position: fixed;
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  padding: 7px 14px 7px 12px;
+  max-width: 480px;
+  background: rgba(10, 10, 16, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-left: 3px solid #f97316;
+  border-radius: 10px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.88);
+  user-select: none;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.55),
+    0 0 14px rgba(249, 115, 22, 0.18),
+    0 0 0 1px rgba(255, 255, 255, 0.04);
+  white-space: normal;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+#bd-badge.bd-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+
+#bd-badge.bd-hidden {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-6px);
+  pointer-events: none;
+}
+
+.bd-main-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  white-space: nowrap;
+}
+
+.bd-icon {
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+  color: #f97316;
+}
+
+.bd-msg {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 400;
+  flex: 1;
+  white-space: normal;
+}
+
+.bd-btn {
+  flex-shrink: 0;
+  background: rgba(249, 115, 22, 0.12);
+  border: 1px solid rgba(249, 115, 22, 0.32);
+  border-radius: 5px;
+  color: #f97316;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  margin-left: 6px;
+  transition: background 0.12s ease;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+.bd-btn:hover {
+  background: rgba(249, 115, 22, 0.22);
+}
+
+.bd-tooltip {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  width: 100%;
+}
+
+.bd-tooltip[hidden] {
+  display: none;
+}
+
+.bd-tooltip-section {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.bd-tooltip-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.bd-tooltip-items {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.5;
+}
+
+.bd-tooltip-combined {
+  font-size: 12px;
+  color: #f97316;
+  font-style: italic;
+  line-height: 1.5;
+}
