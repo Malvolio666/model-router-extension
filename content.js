@@ -360,17 +360,27 @@
   // BATCH DETECTOR
   // ══════════════════════════════════════════════════════════════════════════
 
-  const BATCH_WORD_THRESHOLD = 15;       // prompt considered "short" below this
-  const BATCH_MIN_HISTORY    = 2;        // short messages needed in session
-  const BATCH_COOLDOWN_MS    = 5 * 60 * 1000; // 5 min between badge shows
+  const BATCH_MAX_WORDS    = 8;
+  const BATCH_ACTION_VERBS = new Set([
+    'summarize', 'write', 'list', 'pull', 'extract', 'translate',
+    'fix', 'explain', 'generate', 'describe', 'outline', 'draft',
+    'create', 'find', 'identify', 'compare', 'review', 'suggest',
+  ]);
 
-  let batchBadge         = null;
-  let batchCooldownUntil = 0;
-  let shortMsgHistory    = [];           // timestamps of sent short messages this session
-  let batchTooltipOpen   = false;
+  let batchBadge       = null;
+  let sentMsgHistory   = [];    // { verb } for each sent message
+  let batchTooltipOpen = false;
 
   function countWords(text) {
     return text.trim().split(/\s+/).filter(w => w.length > 0).length;
+  }
+
+  function getActionVerb(text) {
+    const lower = text.toLowerCase().trim();
+    for (const verb of BATCH_ACTION_VERBS) {
+      if (new RegExp('\\b' + verb + '\\b').test(lower)) return verb;
+    }
+    return null;
   }
 
   function ensureBatchBadge() {
@@ -434,7 +444,6 @@
 
   function showBatchBadge() {
     const b = ensureBatchBadge();
-    batchCooldownUntil = Date.now() + BATCH_COOLDOWN_MS;
     requestAnimationFrame(() => {
       positionBatchBadge();
       b.className = 'bd-visible';
@@ -454,28 +463,29 @@
 
   function checkBatchOpportunity(text) {
     if (!isEnabled) return false;
-    if (countWords(text) >= BATCH_WORD_THRESHOLD) return false;
-    if (shortMsgHistory.length < BATCH_MIN_HISTORY) return false;
-    if (Date.now() < batchCooldownUntil) return false;
-    return true;
+    if (countWords(text) > BATCH_MAX_WORDS) return false;
+    const currentVerb = getActionVerb(text);
+    if (!currentVerb) return false;
+    // Need last 2 sent messages to each have a different action verb
+    const recent = sentMsgHistory.filter(m => m.verb !== null).slice(-2);
+    if (recent.length < 2) return false;
+    const verbs = new Set([recent[0].verb, recent[1].verb, currentVerb]);
+    return verbs.size === 3; // all three must be distinct
   }
 
   function recordSentMessage(text) {
     if (!text) return;
-    if (countWords(text) < BATCH_WORD_THRESHOLD) {
-      shortMsgHistory.push(Date.now());
-    }
+    sentMsgHistory.push({ verb: getActionVerb(text) });
   }
 
   // ══════════════════════════════════════════════════════════════════════════
   // NEW CHAT SUGGESTION
   // ══════════════════════════════════════════════════════════════════════════
 
-  const NC_MIN_MESSAGES      = 6;
   const NC_OVERLAP_THRESHOLD = 0.20;
 
   const NC_STOP_WORDS = new Set([
-    // English
+    // English — function words, auxiliaries, pronouns, conversational filler
     'the','a','an','is','are','was','were','be','been','being','have','has',
     'had','do','does','did','will','would','could','should','may','might',
     'shall','can','to','of','in','for','on','with','at','by','from','up',
@@ -484,12 +494,17 @@
     'how','when','where','why','all','more','also','just','than','then',
     'so','but','and','or','not','no','if','as','get','make','use','like',
     'want','need','know','think','see','go','here','now','okay','yes',
-    // French
+    'please','thanks','thank','hello','sure','well','right','actually',
+    'really','very','much','many','some','any','other','same','another',
+    'every','each','still','going','using','help','good','great','okay',
+    // French — mots outils, pronoms, auxiliaires, conversation
     'le','la','les','un','une','des','de','du','en','et','ou','est','sont',
     'que','qui','dans','pour','sur','avec','par','au','aux','pas','ne','se',
     'ce','je','tu','il','elle','nous','vous','ils','elles','me','te','lui',
     'leur','mon','ma','mes','ton','ta','tes','son','sa','ses','mais','donc',
     'car','ni','si','très','plus','bien','tout','cette','aussi','comme',
+    'merci','bonjour','salut','voici','voilà','alors','avoir','faire',
+    'veux','peux','dois','faut','même','autre','quand','dont','sans',
   ]);
 
   let newChatBadge   = null;
@@ -533,10 +548,13 @@
   function detectTopicChange(currentText) {
     try {
       const messages = getConversationMessages();
-      if (messages.length < NC_MIN_MESSAGES) return false;
+      if (messages.length < 2) return false;
 
+      // Early context: first third of conversation (minimum 1 message)
       const firstThird = Math.max(1, Math.floor(messages.length / 3));
       const earlyText  = messages.slice(0, firstThird).join(' ');
+
+      // Recent context: last 3 user messages + optional current draft
       const recentMsgs = messages.slice(-3);
       const recentText = currentText
         ? [...recentMsgs, currentText].join(' ')
@@ -544,6 +562,9 @@
 
       const earlyKw  = extractKeywords(earlyText);
       const recentKw = extractKeywords(recentText);
+
+      // Require enough meaningful keywords on both sides for a valid comparison
+      if (earlyKw.size < 2 || recentKw.size < 2) return false;
 
       return jaccardSimilarity(earlyKw, recentKw) < NC_OVERLAP_THRESHOLD;
     } catch (_) {
@@ -629,25 +650,35 @@
     requestAnimationFrame(() => {
       rafPending = false;
       const text = getEditorText(el);
+      const wc   = countWords(text);
+
       if (text.trim().length < 5) {
         hideBadge();
         hideBatchBadge();
+        hideNewChatBadge();
         return;
       }
 
-      // Model Router badge
+      // Model Router badge (always shown regardless of length)
       const result = analyzeComplexity(text);
       if (result) showBadge(result);
       else hideBadge();
 
-      // Batch Detector badge
-      if (countWords(text) >= BATCH_WORD_THRESHOLD) {
+      // Global rule: hide suggestion badges the moment the user types a real prompt
+      if (wc > 6) {
         hideBatchBadge();
-      } else if (checkBatchOpportunity(text)) {
-        showBatchBadge();
+        hideNewChatBadge();
+        return;
       }
 
-      // New Chat Suggestion: hide when the user types something on-topic
+      // Batch Detector (≤ 6 words only)
+      if (checkBatchOpportunity(text)) {
+        showBatchBadge();
+      } else {
+        hideBatchBadge();
+      }
+
+      // New Chat Suggestion: hide in real-time if draft brings topic back on track
       if (newChatShown && newChatBadge && newChatBadge.className === 'nc-visible') {
         if (!detectTopicChange(text)) hideNewChatBadge();
       }
@@ -691,7 +722,7 @@
         lastUrl = currentUrl;
         newChatShown = false;
         hideNewChatBadge();
-        shortMsgHistory = [];
+        sentMsgHistory = [];
       }
 
       // Schedule topic drift check after DOM settles
