@@ -346,12 +346,14 @@
       positionBadge();
       b.className = 'mr-visible';
       if (batchBadge && batchBadge.className === 'bd-visible') positionBatchBadge();
+      if (newChatBadge && newChatBadge.className === 'nc-visible') positionNewChatBadge();
     });
   }
 
   function hideBadge() {
     if (badge) badge.className = 'mr-hidden';
     if (batchBadge && batchBadge.className === 'bd-visible') positionBatchBadge();
+    if (newChatBadge && newChatBadge.className === 'nc-visible') positionNewChatBadge();
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -447,6 +449,7 @@
     const btn = batchBadge.querySelector('.bd-btn');
     if (tt)  tt.setAttribute('hidden', '');
     if (btn) btn.textContent = 'Show me how';
+    if (newChatBadge && newChatBadge.className === 'nc-visible') positionNewChatBadge();
   }
 
   function checkBatchOpportunity(text) {
@@ -462,6 +465,148 @@
     if (countWords(text) < BATCH_WORD_THRESHOLD) {
       shortMsgHistory.push(Date.now());
     }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // NEW CHAT SUGGESTION
+  // ══════════════════════════════════════════════════════════════════════════
+
+  const NC_MIN_MESSAGES      = 6;
+  const NC_OVERLAP_THRESHOLD = 0.20;
+
+  const NC_STOP_WORDS = new Set([
+    // English
+    'the','a','an','is','are','was','were','be','been','being','have','has',
+    'had','do','does','did','will','would','could','should','may','might',
+    'shall','can','to','of','in','for','on','with','at','by','from','up',
+    'about','into','this','that','these','those','i','me','my','we','our',
+    'you','your','he','she','it','its','they','their','what','which','who',
+    'how','when','where','why','all','more','also','just','than','then',
+    'so','but','and','or','not','no','if','as','get','make','use','like',
+    'want','need','know','think','see','go','here','now','okay','yes',
+    // French
+    'le','la','les','un','une','des','de','du','en','et','ou','est','sont',
+    'que','qui','dans','pour','sur','avec','par','au','aux','pas','ne','se',
+    'ce','je','tu','il','elle','nous','vous','ils','elles','me','te','lui',
+    'leur','mon','ma','mes','ton','ta','tes','son','sa','ses','mais','donc',
+    'car','ni','si','très','plus','bien','tout','cette','aussi','comme',
+  ]);
+
+  let newChatBadge   = null;
+  let newChatShown   = false;    // at most once per conversation
+  let lastUrl        = '';
+  let ncCheckTimeout = null;
+
+  function extractKeywords(text) {
+    return new Set(
+      text.toLowerCase()
+        .replace(/[^a-zàâäéèêëîïôùûüÿœç0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 3 && !NC_STOP_WORDS.has(w))
+    );
+  }
+
+  function getConversationMessages() {
+    const selectors = [
+      '[data-testid="human-turn"]',
+      '[data-testid="user-turn"]',
+      '[class*="human-turn"]',
+      '[class*="HumanTurn"]',
+      '[class*="user-message"]',
+      '[class*="UserMessage"]',
+    ];
+    for (const sel of selectors) {
+      const els = document.querySelectorAll(sel);
+      if (els.length > 0) return Array.from(els).map(el => (el.textContent || '').trim());
+    }
+    return [];
+  }
+
+  function jaccardSimilarity(setA, setB) {
+    if (setA.size === 0 && setB.size === 0) return 1;
+    if (setA.size === 0 || setB.size === 0) return 0;
+    let common = 0;
+    for (const w of setA) { if (setB.has(w)) common++; }
+    return common / (setA.size + setB.size - common);
+  }
+
+  function detectTopicChange(currentText) {
+    try {
+      const messages = getConversationMessages();
+      if (messages.length < NC_MIN_MESSAGES) return false;
+
+      const firstThird = Math.max(1, Math.floor(messages.length / 3));
+      const earlyText  = messages.slice(0, firstThird).join(' ');
+      const recentMsgs = messages.slice(-3);
+      const recentText = currentText
+        ? [...recentMsgs, currentText].join(' ')
+        : recentMsgs.join(' ');
+
+      const earlyKw  = extractKeywords(earlyText);
+      const recentKw = extractKeywords(recentText);
+
+      return jaccardSimilarity(earlyKw, recentKw) < NC_OVERLAP_THRESHOLD;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function ensureNewChatBadge() {
+    if (newChatBadge) return newChatBadge;
+    newChatBadge = document.createElement('div');
+    newChatBadge.id = 'nc-badge';
+    newChatBadge.className = 'nc-hidden';
+    newChatBadge.innerHTML =
+      '<span class="nc-icon">⊙</span>' +
+      '<span class="nc-msg">Topic change detected — a new chat gives Claude a cleaner context</span>' +
+      '<button class="nc-btn" type="button">New chat</button>';
+
+    newChatBadge.querySelector('.nc-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      window.location.href = 'https://claude.ai/new';
+    });
+
+    document.body.appendChild(newChatBadge);
+    return newChatBadge;
+  }
+
+  function positionNewChatBadge() {
+    if (!newChatBadge) return;
+    let top = 20;
+    if (badge && badge.className === 'mr-visible') {
+      const r = badge.getBoundingClientRect();
+      top = Math.max(top, r.bottom + 8);
+    }
+    if (batchBadge && batchBadge.className === 'bd-visible') {
+      const r = batchBadge.getBoundingClientRect();
+      top = Math.max(top, r.bottom + 8);
+    }
+    newChatBadge.style.top    = top + 'px';
+    newChatBadge.style.left   = '50%';
+    newChatBadge.style.right  = 'auto';
+    newChatBadge.style.bottom = 'auto';
+  }
+
+  function showNewChatBadge() {
+    const b = ensureNewChatBadge();
+    newChatShown = true;
+    requestAnimationFrame(() => {
+      positionNewChatBadge();
+      b.className = 'nc-visible';
+    });
+  }
+
+  function hideNewChatBadge() {
+    if (newChatBadge) newChatBadge.className = 'nc-hidden';
+  }
+
+  function scheduleTopicCheck() {
+    if (ncCheckTimeout) clearTimeout(ncCheckTimeout);
+    ncCheckTimeout = setTimeout(() => {
+      ncCheckTimeout = null;
+      if (!isEnabled || newChatShown) return;
+      if (detectTopicChange('')) showNewChatBadge();
+    }, 600);
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -501,6 +646,11 @@
       } else if (checkBatchOpportunity(text)) {
         showBatchBadge();
       }
+
+      // New Chat Suggestion: hide when the user types something on-topic
+      if (newChatShown && newChatBadge && newChatBadge.className === 'nc-visible') {
+        if (!detectTopicChange(text)) hideNewChatBadge();
+      }
     });
   }
 
@@ -508,6 +658,7 @@
     recordSentMessage(text);
     hideBadge();
     hideBatchBadge();
+    hideNewChatBadge();
     rafPending = false;
   }
 
@@ -520,8 +671,10 @@
       isEnabled = res.mrEnabled !== false;
     });
 
+    lastUrl = window.location.href;
     ensureBadge();
     ensureBatchBadge();
+    ensureNewChatBadge();
 
     document.addEventListener('input', e => {
       if (isMainEditor(e.target)) handleEditorInput(e.target);
@@ -530,6 +683,19 @@
     new MutationObserver(() => {
       if (badge && badge.className === 'mr-visible') positionBadge();
       if (batchBadge && batchBadge.className === 'bd-visible') positionBatchBadge();
+      if (newChatBadge && newChatBadge.className === 'nc-visible') positionNewChatBadge();
+
+      // Detect conversation navigation (SPA URL change)
+      const currentUrl = window.location.href;
+      if (currentUrl !== lastUrl) {
+        lastUrl = currentUrl;
+        newChatShown = false;
+        hideNewChatBadge();
+        shortMsgHistory = [];
+      }
+
+      // Schedule topic drift check after DOM settles
+      if (isEnabled && !newChatShown) scheduleTopicCheck();
     }).observe(document.body, { childList: true, subtree: true });
 
     document.addEventListener('keydown', e => {
@@ -544,8 +710,8 @@
     document.addEventListener('click', e => {
       const btn = e.target.closest('button');
       if (!btn) return;
-      // Ignore clicks inside the batch badge itself
-      if (btn.closest('#bd-badge')) return;
+      // Ignore clicks inside our own badges
+      if (btn.closest('#bd-badge') || btn.closest('#nc-badge')) return;
       const lbl  = (btn.getAttribute('aria-label') || '').toLowerCase();
       const type = btn.getAttribute('type') || '';
       if (lbl.includes('send') || lbl.includes('envoyer') || type === 'submit') {
@@ -559,6 +725,7 @@
     window.addEventListener('resize', () => {
       if (badge && badge.className === 'mr-visible') positionBadge();
       if (batchBadge && batchBadge.className === 'bd-visible') positionBatchBadge();
+      if (newChatBadge && newChatBadge.className === 'nc-visible') positionNewChatBadge();
     }, { passive: true });
   }
 
@@ -568,6 +735,7 @@
       if (!isEnabled) {
         hideBadge();
         hideBatchBadge();
+        hideNewChatBadge();
       }
     }
   });
